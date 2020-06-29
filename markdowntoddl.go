@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 )
 
 // カラム
@@ -18,16 +19,23 @@ type columns struct {
 	Comment       string
 }
 
+// 現在日時取得
+func now() string {
+	return time.Now().Format("2006/01/02 15:04:05")
+}
+
 // エントリーポイント
 func main() {
-	fmt.Printf("読み込みファイル：[%s]", os.Args[1])
+	fmt.Printf("%s 処理開始\n", now())
 	// ファイル読み込み
+	fmt.Printf("読み込みファイル：[%s]\n", os.Args[1])
 	readLines := readFile(os.Args[1])
 	// DDL作成
 	outputFileName, ddl := parseMarkdownToDDL(readLines)
 	// ファイル書き出し
-	fmt.Println(outputFileName)
-	fmt.Printf("%v", ddl)
+	fmt.Printf("書き出しファイル：[%s]\n", outputFileName)
+	writeFile(outputFileName, ddl)
+	fmt.Printf("%s 処理終了\n", now())
 }
 
 // ファイル読み込み
@@ -48,7 +56,7 @@ func readFile(filePath string) []string {
 
 	// エラー
 	if serr := scanner.Err(); serr != nil {
-		fmt.Fprintf(os.Stderr, "File %s scan error: %v\n", filePath, err)
+		fmt.Fprintf(os.Stderr, "ファイル読み込みエラー（ファイル：[%s]、エラー: [%v]）\n", filePath, err)
 	}
 
 	return lines
@@ -69,7 +77,7 @@ func parseMarkdownToDDL(lines []string) (string, []string) {
 	for rowCounter, line := range lines {
 		// h1見出し
 		if strings.HasPrefix(line, "# ") {
-			outputFileName = strings.TrimSpace(line[1:])
+			outputFileName = strings.TrimSpace(line[1:]) + ".sql"
 			continue
 		}
 		// h2見出し
@@ -115,14 +123,16 @@ func parseMarkdownToDDL(lines []string) (string, []string) {
 		// h3見出し内容
 		if 0 < len(strings.TrimSpace(line)) {
 			col := parseTalbeToColumn(line)
-			ddl = append(ddl, fmt.Sprintf("%s %s %s %s %s %s %s", col.Name, col.Type, col.NotNull, col.Default, col.AutoIncrement, col.Key, col.Comment))
 			if rowCounter+1 == len(lines) || 1 > len(strings.TrimSpace(lines[rowCounter+1])) {
+				ddl = append(ddl, fmt.Sprintf("%s %s %s %s %s %s %s", col.Name, col.Type, col.NotNull, col.Default, col.AutoIncrement, col.Key, col.Comment))
 				// create table 終了
 				if 0 < len(tableComment) {
-					ddl = append(ddl, fmt.Sprintf(") ENGINE = InnoDB DEFAULT CHARSET utf8 comment `%s`;", tableComment))
+					ddl = append(ddl, fmt.Sprintf(") ENGINE = InnoDB DEFAULT CHARSET utf8 comment '%s';", tableComment))
 				} else {
 					ddl = append(ddl, fmt.Sprintf(") ENGINE = InnoDB DEFAULT CHARSET utf8;"))
 				}
+			} else {
+				ddl = append(ddl, fmt.Sprintf("%s %s %s %s %s %s %s,", col.Name, col.Type, col.NotNull, col.Default, col.AutoIncrement, col.Key, col.Comment))
 			}
 		}
 	}
@@ -166,7 +176,7 @@ func parseTalbeToColumn(line string) columns {
 
 	colComment := ""
 	if 0 < len(strings.TrimSpace(splited[6])) {
-		colComment = fmt.Sprintf("comment `%s`", strings.TrimSpace(splited[6]))
+		colComment = fmt.Sprintf("comment '%s'", strings.TrimSpace(splited[6]))
 	}
 
 	return columns{
@@ -177,5 +187,27 @@ func parseTalbeToColumn(line string) columns {
 		Key:           colKey,
 		AutoIncrement: colAutoIncrement,
 		Comment:       colComment,
+	}
+}
+
+// ファイル書き出し
+func writeFile(outputFileName string, lines []string) {
+	// オープン・クローズ
+	fp, err := os.Create(outputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer fp.Close()
+
+	for _, line := range lines {
+		var err error
+		if strings.HasPrefix(line, "`") {
+			_, err = fp.WriteString("  " + strings.TrimSpace(line) + "\n")
+		} else {
+			_, err = fp.WriteString(strings.TrimSpace(line) + "\n")
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ファイル書き込みエラー（ファイル：[%s]、エラー：[%v]）\n", outputFileName, err)
+		}
 	}
 }
