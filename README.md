@@ -2,7 +2,24 @@
 
 マークダウンからMariaDB（MySQL）のDDLを生成する。
 
-## 記述方法
+## インストール
+
+``` cmd
+go get -u github.com/saihe/markdowntoddl/
+```
+
+## 起動
+
+``` cmd
+markdowntoddl マークダウンファイル
+```
+  
+``` cmd
+例）
+markdowntoddl tables.md
+```
+
+## マークダウン記述方法
 
 ### h1見出し
 
