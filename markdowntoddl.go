@@ -150,7 +150,6 @@ func parseMarkdownToDDL(lines []string) (string, []string) {
 				}
 			}
 			if extraFlag {
-				fmt.Println(line[2:])
 				ddl = append(ddl, fmt.Sprintf("alter table `%s` add %s;", tableName, line[2:]))
 			}
 		}
@@ -200,7 +199,7 @@ func parseTalbeToColumn(line string) columns {
 
 	colComment := ""
 	if 0 < len(strings.TrimSpace(splited[7])) {
-		colComment = fmt.Sprintf("comment '%s'", strings.TrimSpace(splited[6]))
+		colComment = fmt.Sprintf("comment '%s'", strings.TrimSpace(splited[7]))
 	}
 
 	return columns{
