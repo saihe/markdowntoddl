@@ -16,6 +16,7 @@ type columns struct {
 	Default       string
 	Key           string
 	AutoIncrement string
+	Extra         string
 	Comment       string
 }
 
@@ -70,9 +71,12 @@ func parseMarkdownToDDL(lines []string) (string, []string) {
 	// テーブル定義
 	h1Flag := true
 	h2Flag := false
+	tableName := ""
 	tableComment := ""
 	// カラム定義
 	tableCounter := 0
+	columnFlag := false
+	extraFlag := false
 
 	for rowCounter, line := range lines {
 		// h1見出し
@@ -85,8 +89,9 @@ func parseMarkdownToDDL(lines []string) (string, []string) {
 			h1Flag = false
 			h2Flag = true
 			tableCounter = 0
-			ddl = append(ddl, fmt.Sprintf("drop table if exists `%s`;", strings.TrimSpace(line[2:])))
-			ddl = append(ddl, fmt.Sprintf("create table `%s` (", strings.TrimSpace(line[2:])))
+			tableName = strings.TrimSpace(line[2:])
+			ddl = append(ddl, fmt.Sprintf("drop table if exists `%s`;", tableName))
+			ddl = append(ddl, fmt.Sprintf("create table `%s` (", tableName))
 			continue
 		}
 		// h2見出しまで無視
@@ -101,6 +106,14 @@ func parseMarkdownToDDL(lines []string) (string, []string) {
 		// h3見出し
 		if strings.HasPrefix(line, "### ") {
 			h2Flag = false
+			if strings.HasSuffix(line, "_columns") {
+				columnFlag = true
+				extraFlag = false
+			}
+			if strings.HasSuffix(line, "_extra") {
+				columnFlag = false
+				extraFlag = true
+			}
 			continue
 		}
 		// h3見出しまで無視
@@ -116,23 +129,29 @@ func parseMarkdownToDDL(lines []string) (string, []string) {
 			continue
 		}
 		// h3見出し内容表戦闘２行無視
-		if 2 > tableCounter {
+		if columnFlag && 2 > tableCounter {
 			tableCounter++
 			continue
 		}
 		// h3見出し内容
 		if 0 < len(strings.TrimSpace(line)) {
-			col := parseTalbeToColumn(line)
-			if rowCounter+1 == len(lines) || 1 > len(strings.TrimSpace(lines[rowCounter+1])) {
-				ddl = append(ddl, fmt.Sprintf("%s %s %s %s %s %s %s", col.Name, col.Type, col.NotNull, col.Default, col.AutoIncrement, col.Key, col.Comment))
-				// create table 終了
-				if 0 < len(tableComment) {
-					ddl = append(ddl, fmt.Sprintf(") ENGINE = InnoDB DEFAULT CHARSET utf8 comment '%s';", tableComment))
+			if columnFlag {
+				col := parseTalbeToColumn(line)
+				if rowCounter+1 == len(lines) || 1 > len(strings.TrimSpace(lines[rowCounter+1])) {
+					ddl = append(ddl, fmt.Sprintf("%s %s %s %s %s %s %s", col.Name, col.Type, col.NotNull, col.Default, col.AutoIncrement, col.Key, col.Comment))
+					// create table 終了
+					if 0 < len(tableComment) {
+						ddl = append(ddl, fmt.Sprintf(") ENGINE = InnoDB DEFAULT CHARSET utf8 comment '%s';", tableComment))
+					} else {
+						ddl = append(ddl, fmt.Sprintf(") ENGINE = InnoDB DEFAULT CHARSET utf8;"))
+					}
 				} else {
-					ddl = append(ddl, fmt.Sprintf(") ENGINE = InnoDB DEFAULT CHARSET utf8;"))
+					ddl = append(ddl, fmt.Sprintf("%s %s %s %s %s %s %s,", col.Name, col.Type, col.NotNull, col.Default, col.AutoIncrement, col.Key, col.Comment))
 				}
-			} else {
-				ddl = append(ddl, fmt.Sprintf("%s %s %s %s %s %s %s,", col.Name, col.Type, col.NotNull, col.Default, col.AutoIncrement, col.Key, col.Comment))
+			}
+			if extraFlag {
+				fmt.Println(line[2:])
+				ddl = append(ddl, fmt.Sprintf("alter table `%s` add %s;", tableName, line[2:]))
 			}
 		}
 	}
@@ -174,8 +193,13 @@ func parseTalbeToColumn(line string) columns {
 		colAutoIncrement = "auto_increment"
 	}
 
-	colComment := ""
+	colExtra := ""
 	if 0 < len(strings.TrimSpace(splited[6])) {
+		colExtra = strings.TrimSpace(splited[6])
+	}
+
+	colComment := ""
+	if 0 < len(strings.TrimSpace(splited[7])) {
 		colComment = fmt.Sprintf("comment '%s'", strings.TrimSpace(splited[6]))
 	}
 
@@ -186,6 +210,7 @@ func parseTalbeToColumn(line string) columns {
 		Default:       colDefault,
 		Key:           colKey,
 		AutoIncrement: colAutoIncrement,
+		Extra:         colExtra,
 		Comment:       colComment,
 	}
 }
