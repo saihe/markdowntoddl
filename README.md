@@ -35,7 +35,7 @@ markdowntoddl tables.md
 * テーブル名_columnsと記載する。  
 表形式でテーブル定義を記載する。  
 テーブルヘッダー（カラム）は以下の通り。  
-`name|type|not null|default|key|extra|comment`
+`name|type|not null|default|key|auto increment|extra|comment`
 
 | | |
 ---|---
@@ -44,6 +44,7 @@ type|データ型（サイズ）
 not null|not null制約の有無（y/記載なし）
 default|デフォルト値
 key|キー制約（p/u/記載なし）
+auto increment|自動採番の有無（y/記載なし）
 extra|その他制約
 comment|カラムコメント
 
